@@ -1,3 +1,4 @@
+use crate::tokens::TokenMode;
 use crate::tokens::Tokens;
 
 pub struct Lexer {
@@ -20,11 +21,15 @@ impl Lexer {
 
     pub fn read_char(&mut self) {
         if self.read_position >= self.input.len() {
-        } else {
+            return;
         }
 
         self.position = self.read_position;
         self.read_position += 1;
+
+        if self.input.as_bytes()[self.position].is_ascii_whitespace() {
+            self.read_char();
+        }
     }
 
     pub fn read_identifier(&mut self) -> &str {
@@ -34,10 +39,10 @@ impl Lexer {
             self.read_char();
         }
 
-        &self.input[internal_pos..self.position]
+        &self.input[internal_pos..self.read_position]
     }
 
-    pub fn next_token(&mut self) -> Tokens {
+    pub fn next_token(&mut self, mode: TokenMode) -> Tokens {
         let mut raw_input_slice = &self.input[self.position..self.read_position];
 
         if Tokens::is_valid_iden_char(
@@ -49,7 +54,7 @@ impl Lexer {
             raw_input_slice = self.read_identifier();
         }
 
-        let token: Tokens = Tokens::to_token(raw_input_slice);
+        let token: Tokens = Tokens::to_token(raw_input_slice, mode);
         self.read_char();
         return token;
     }
@@ -57,6 +62,7 @@ impl Lexer {
 
 #[cfg(test)]
 mod tests {
+    use crate::tokens::TokenMode;
     use crate::tokens::Tokens;
 
     #[test]
@@ -115,7 +121,15 @@ mod tests {
         let mut res: Vec<Tokens> = Vec::new();
 
         for _ in 0..expected_result.len() {
-            res.push(lexer.next_token());
+            let mut mode = TokenMode::NORMAL;
+            if res.len() > 0 {
+                mode = match res[std::cmp::max(res.len() - 1, 0)] {
+                    Tokens::ASSIGN => TokenMode::ASSIGN,
+                    _ => TokenMode::NORMAL,
+                };
+            }
+
+            res.push(lexer.next_token(mode));
         }
 
         assert_eq!(expected_result, res);
