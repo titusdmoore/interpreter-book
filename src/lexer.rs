@@ -34,9 +34,21 @@ impl Lexer {
 
     pub fn read_identifier(&mut self) -> &str {
         let internal_pos = self.position;
+        let mut len = 0;
 
-        while Tokens::is_valid_iden_char(self.input.as_bytes()[self.read_position] as char) {
+        while Tokens::should_walk_next_char(self.input.as_bytes()[self.read_position] as char) {
+            // Break if more than 2 chars, or if invalid bang combination
+            if Tokens::is_valid_multichar_token_char(
+                self.input.as_bytes()[self.read_position] as char,
+            ) && (len == 1
+                || self.input.as_bytes()[internal_pos] as char == '!'
+                    && self.input.as_bytes()[self.read_position] as char != '=')
+            {
+                break;
+            }
+
             self.read_char();
+            len += 1;
         }
 
         &self.input[internal_pos..self.read_position]
@@ -45,7 +57,7 @@ impl Lexer {
     pub fn next_token(&mut self, mode: TokenMode) -> Tokens {
         let mut raw_input_slice = &self.input[self.position..self.read_position];
 
-        if Tokens::is_valid_iden_char(
+        if Tokens::should_walk_next_char(
             raw_input_slice
                 .chars()
                 .next()
@@ -75,8 +87,18 @@ mod tests {
             let add = fn(a, b) {
                 a + b; 
             };
+            !</>*5
+    
+
             let result = add(myInt, myInt2);
-",
+            <=>===||&&!=
+            
+            if (5 < 10) {
+                return true;
+            } else {
+                return false;
+            }
+            ",
         );
         let expected_result: Vec<Tokens> = vec![
             Tokens::LET,
@@ -105,6 +127,12 @@ mod tests {
             Tokens::SEMICOLON,
             Tokens::CLOSECURLY,
             Tokens::SEMICOLON,
+            Tokens::BANG,
+            Tokens::LESS,
+            Tokens::SLASH,
+            Tokens::GREATER,
+            Tokens::ASTERISK,
+            Tokens::INTEGER(5),
             Tokens::LET,
             Tokens::IDENTIFIER(String::from("result")),
             Tokens::ASSIGN,
@@ -115,12 +143,36 @@ mod tests {
             Tokens::IDENTIFIER(String::from("myInt2")),
             Tokens::CLOSEPAREN,
             Tokens::SEMICOLON,
+            Tokens::LESSEQUAL,
+            Tokens::GREATEREQUAL,
+            Tokens::EQUALS,
+            Tokens::OR,
+            Tokens::AND,
+            Tokens::NOTEQUALS,
+            Tokens::IF,
+            Tokens::OPENPAREN,
+            Tokens::INTEGER(5),
+            Tokens::LESS,
+            Tokens::INTEGER(10),
+            Tokens::CLOSEPAREN,
+            Tokens::OPENCURLY,
+            Tokens::RETURN,
+            Tokens::TRUE,
+            Tokens::SEMICOLON,
+            Tokens::CLOSECURLY,
+            Tokens::ELSE,
+            Tokens::OPENCURLY,
+            Tokens::RETURN,
+            Tokens::FALSE,
+            Tokens::SEMICOLON,
+            Tokens::CLOSECURLY,
         ];
 
         let mut lexer = super::Lexer::new(input);
         let mut res: Vec<Tokens> = Vec::new();
 
-        for _ in 0..expected_result.len() {
+        // for _ in 0..expected_result.len() {
+        while lexer.read_position < lexer.input.len() {
             let mut mode = TokenMode::NORMAL;
             if res.len() > 0 {
                 mode = match res[std::cmp::max(res.len() - 1, 0)] {
